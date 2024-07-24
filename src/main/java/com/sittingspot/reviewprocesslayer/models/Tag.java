@@ -1,5 +1,5 @@
 package com.sittingspot.reviewprocesslayer.models;
 
-public record Review(String corpus){
 
+public record Tag(String key, String value) {
 }
