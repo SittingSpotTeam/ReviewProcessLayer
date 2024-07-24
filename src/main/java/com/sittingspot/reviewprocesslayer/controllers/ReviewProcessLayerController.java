@@ -21,7 +21,7 @@ public class ReviewProcessLayerController {
     }
 
     @PostMapping
-    public void postReview(@RequestParam UUID id, @RequestBody String corpu){
+    public void postReview(@RequestParam UUID id, @RequestBody Review review){
         //TODO
     }
 }
