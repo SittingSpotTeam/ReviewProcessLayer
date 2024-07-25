@@ -1,15 +1,11 @@
 package com.sittingspot.reviewprocesslayer.controllers;
 
 import com.sittingspot.reviewprocesslayer.models.Review;
+import com.sittingspot.reviewprocesslayer.models.Tag;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -62,7 +58,7 @@ public class ReviewProcessLayerController {
     private int tagextractor_port = 8080;
     private RestTemplate restTemplate = new RestTemplate();
 
-
+    private String current_version = "v1";
     //TODO WHEN TAG EXTRACTION?
 
     @GetMapping
@@ -71,7 +67,7 @@ public class ReviewProcessLayerController {
         HttpHeaders headers = new HttpHeaders();
         //SET CUSTOM HEADERS
         HttpEntity<String> request = new HttpEntity<>(null, headers);
-        String url = "http://"+ reviewdl_host+":"+reviewdl_port+"/review-dl/api/v1";
+        String url = "http://"+ reviewdl_host+":"+reviewdl_port+"/review-dl/api/"+current_version;
         ResponseEntity<List<Review>> result = restTemplate.exchange(
                                                 url, HttpMethod.GET, request,
                                                 new ParameterizedTypeReference<List<Review>>() {},
@@ -79,39 +75,53 @@ public class ReviewProcessLayerController {
         if (result.getStatusCode() == HttpStatus.OK) {
             review_list = result.getBody();
         }
+        else{
+            System.err.println("Error while getting reviews: "+result.getStatusCode());
+        }
         return review_list;
     }
 
 
     @PostMapping
-    public HttpStatusCode postReview(@RequestParam UUID id, @RequestBody Review review){
+    public void postReview(@RequestParam UUID id, @RequestBody Review review){
         HttpHeaders headers = new HttpHeaders();
-        //TODO SET CUSTOM PARAMETERS
+        //TODO SET CUSTOM HEADERS
 
         //CENSORING REVIEW
         HttpEntity<Review> moderation_request = new HttpEntity<>(review, headers);
-        String moderation_url = "http://"+ moderation_host+":"+moderation_port+"/moderation/api/v1";
+        String moderation_url = "http://"+ moderation_host+":"+moderation_port+"/moderation/api/"+current_version;
         ResponseEntity<Review> moderation_result = restTemplate.exchange(moderation_url, HttpMethod.POST, moderation_request,Review.class ) ;
-        Review censored_review = new Review(moderation_url);
-        if(moderation_result.getStatusCode() == HttpStatus.OK){
-            censored_review = moderation_result.getBody();
+        if(moderation_result.getStatusCode() != HttpStatus.OK){
+            System.err.println("Error while moderating review: "+moderation_result.getStatusCode());
+        }
+        Review censored_review = moderation_result.getBody();
+
+        //EXTRACTING TAGS
+        HttpEntity<Review> tag_request = new HttpEntity<>(censored_review, headers);
+        String tag_url = "http://"+tagextractor_host+":"+tagextractor_port+"/tag-logic/api/"+current_version;
+        ResponseEntity<List<Tag>> tag_result = restTemplate.exchange(
+                                                tag_url, HttpMethod.POST, tag_request,
+                                                new ParameterizedTypeReference<List<Tag>>() {},
+                                                Collections.emptyMap() ) ;
+        if (tag_result.getStatusCode() == HttpStatus.OK){
+            //TODO WHO TO SEND TAGS TO? USE tag_result.getBody()
         }
         else{
-            return moderation_result.getStatusCode();
+            System.err.println("Error while retrieving tags: "+tag_result.getStatusCode());
         }
+
 
         //POSTING CENSORED REVIEW
         HttpEntity<Review> publishing_request = new HttpEntity<>(censored_review, headers);
-        String publishing_url = "http://"+ reviewdl_host+":"+reviewdl_port+"/review-dl/api/v1";
-        ResponseEntity<HttpStatusCode> publishing_result = restTemplate.exchange(publishing_url, HttpMethod.POST,
-                                                                                publishing_request, HttpStatusCode.class ) ;
-        if(publishing_result.getStatusCode() == HttpStatus.OK){
-            return publishing_result.getBody();
+        String publishing_url = "http://"+ reviewdl_host+":"+reviewdl_port+"/tag-logic/api/"+current_version;
+        ResponseEntity<Void> publishing_result = restTemplate.exchange(publishing_url, HttpMethod.POST, publishing_request, Void.class) ;
+        if (publishing_result.getStatusCode() == HttpStatus.OK){
+            return;
         }
         else{
-            return publishing_result.getStatusCode();
+            System.err.println("Error while publishing review: "+ publishing_result.getStatusCode());
         }
 
-        //TODO
+        return;
     }
 }
