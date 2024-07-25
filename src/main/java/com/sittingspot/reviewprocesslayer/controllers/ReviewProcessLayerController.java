@@ -3,7 +3,6 @@ package com.sittingspot.reviewprocesslayer.controllers;
 import com.sittingspot.reviewprocesslayer.models.Review;
 import com.sittingspot.reviewprocesslayer.models.Tag;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
@@ -11,7 +10,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 
 import java.util.ArrayList;
@@ -72,13 +70,7 @@ public class ReviewProcessLayerController {
                                                 url, HttpMethod.GET, request,
                                                 new ParameterizedTypeReference<List<Review>>() {},
                                                 Collections.emptyMap() ) ;
-        if (result.getStatusCode() == HttpStatus.OK) {
-            review_list = result.getBody();
-        }
-        else{
-            System.err.println("Error while getting reviews: "+result.getStatusCode());
-        }
-        return review_list;
+        return result.getBody();
     }
 
 
@@ -87,7 +79,9 @@ public class ReviewProcessLayerController {
         HttpHeaders headers = new HttpHeaders();
         //TODO SET CUSTOM HEADERS
 
-        //CENSORING REVIEW
+        //TODO CHECKING THAT SITTING SPOT EXISTS
+
+        //Cesnoring reviews
         HttpEntity<Review> moderation_request = new HttpEntity<>(review, headers);
         String moderation_url = "http://"+ moderation_host+":"+moderation_port+"/moderation/api/"+current_version;
         ResponseEntity<Review> moderation_result = restTemplate.exchange(moderation_url, HttpMethod.POST, moderation_request,Review.class ) ;
@@ -96,7 +90,7 @@ public class ReviewProcessLayerController {
         }
         Review censored_review = moderation_result.getBody();
 
-        //EXTRACTING TAGS
+        //Extracting tags
         HttpEntity<Review> tag_request = new HttpEntity<>(censored_review, headers);
         String tag_url = "http://"+tagextractor_host+":"+tagextractor_port+"/tag-logic/api/"+current_version;
         ResponseEntity<List<Tag>> tag_result = restTemplate.exchange(
@@ -111,7 +105,7 @@ public class ReviewProcessLayerController {
         }
 
 
-        //POSTING CENSORED REVIEW
+        //Posting censored review
         HttpEntity<Review> publishing_request = new HttpEntity<>(censored_review, headers);
         String publishing_url = "http://"+ reviewdl_host+":"+reviewdl_port+"/tag-logic/api/"+current_version;
         ResponseEntity<Void> publishing_result = restTemplate.exchange(publishing_url, HttpMethod.POST, publishing_request, Void.class) ;
