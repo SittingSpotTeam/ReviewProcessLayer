@@ -17,7 +17,8 @@ paths:
           description: unique id of the sitting spot
           required: true
           schema:
-            $ref: '#/components/schemas/Review'
+            type: string
+            format: uuid
 
       responses:
         200:
@@ -38,14 +39,19 @@ paths:
       summary: Posts new reviews
       description: Posts a new review for an existing sitting spot
       operationId: postReview
+      parameters:
+        - name: sittingSpotId
+          in: query
+          description: unique id of the sitting spot
+          required: true
+          schema:
+            type: string
+            format: uuid
       requestBody:
         content:
           application/json:
             schema:
               properties:
-                sittingSpotId:
-                  type: string
-                  format: uuid
                 review:
                   $ref: '#/components/schemas/Review'
         required: true
