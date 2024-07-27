@@ -6,6 +6,7 @@ import com.sittingspot.reviewprocesslayer.models.Tag;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -60,14 +61,21 @@ public class ReviewProcessLayerController {
     //TODO WHEN TAG EXTRACTION?
 
     @GetMapping
-    public List<Review> getReviewById(@RequestParam UUID id){
-        List<Review> review_list = new ArrayList<>();
+    public List<Review> getReviewById(@RequestParam String id){
+        //Creating header
         HttpHeaders headers = new HttpHeaders();
-        //SET CUSTOM HEADERS
+        //TODO SET CUSTOM HEADERS
         HttpEntity<String> request = new HttpEntity<>(null, headers);
+
+        //generating url
         String url = "http://"+ reviewdl_host+":"+reviewdl_port+"/review-dl/api/"+current_version;
+        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(url)
+                .queryParam("id", id);
+        System.out.println(url);
+
+        //fetching resources
         ResponseEntity<List<Review>> result = restTemplate.exchange(
-                                                url, HttpMethod.GET, request,
+                                                builder.toUriString(), HttpMethod.GET, request,
                                                 new ParameterizedTypeReference<List<Review>>() {},
                                                 Collections.emptyMap() ) ;
         return result.getBody();
