@@ -4,10 +4,10 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class ReviewprocesslayerApplication {
+public class ReviewProcessLayerApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(ReviewprocesslayerApplication.class, args);
+		SpringApplication.run(ReviewProcessLayerApplication.class, args);
 	}
 
 }
