@@ -3,6 +3,8 @@ package com.sittingspot.reviewprocesslayer.controllers;
 import com.sittingspot.reviewprocesslayer.models.Review;
 import com.sittingspot.reviewprocesslayer.models.Tag;
 
+import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
@@ -25,44 +27,20 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
 @RestController
-@RequestMapping("/review-pl/api/v1")
+@RequestMapping("/api/v1")
 public class ReviewProcessLayerController {
 
     private RestTemplate restTemplate = new RestTemplate();
+
     //TODO uncomment
-    @Value("${sittingspot.reviewdl.host}")
-    private String reviewdl_host;
-
-    @Value("${sittingspot.reviewdl.port}")
-    private int reviewdl_port;
-
-    @Value("${sittingspot.searchadapter.host}")
-    private String searchadapter_host;
-
-    @Value("${sittingspot.searchadapter.port}")
-    private int searchadapter_port;
-    
-    @Value("${sittingspot.tagextractor.host}")
-    private String tagextractor_host;
-
-    @Value("${sittingspot.tagextractor.port}")
-    private int tagextractor_port;
-
-    @Value("${sittingspot.moderation.host}")
-    private String moderation_host;
-
-    @Value("${sittingspot.moderation.port}")
-    private int moderation_port;
-    //TODO COMMENT
-    // private String reviewdl_host = "localhost";
-    // private int reviewdl_port = 8080;
-    // private String searchadapter_host = "localhost";
-    // private int searchadapter_port = 8080;
-    // private String moderation_host = "localhost";
-    // private int moderation_port = 8080;
-    // private String tagextractor_host = "localhost";
-    // private int tagextractor_port = 8080;
-    // private RestTemplate restTemplate = new RestTemplate();
+    @Value("${sittingspot.reviewdl.url}")
+    private String reviewdl_url;
+    @Value("${sittingspot.searchadapter.url}")
+    private String searchadapter_url;
+    @Value("${sittingspot.tagextractor.url}")
+    private String tagextractor_url;
+    @Value("${sittingspot.moderation.url}")
+    private String moderation_url;
 
     private String current_version = "v1";
     //TODO WHEN TAG EXTRACTION?
@@ -70,7 +48,7 @@ public class ReviewProcessLayerController {
     @GetMapping
     public List<Review> getReviewById(@RequestParam String id) throws IOException, InterruptedException {
 
-        String url = "http://"+ reviewdl_host+":"+reviewdl_port+"/review-dl/api/"+current_version;
+        String url = "http://"+ reviewdl_url+"/review-dl/api/"+current_version;
         HttpHeaders headers = new HttpHeaders();
         //TODO SET CUSTOM HEADERS
         HttpEntity<String> request = new HttpEntity<>(null, headers);
@@ -97,9 +75,9 @@ public class ReviewProcessLayerController {
 
         //censoring corpus
         HttpEntity<String> moderation_request = new HttpEntity<>(review.corpus(), headers);
-        String moderation_url = "http://"+ moderation_host+":"+moderation_port+"/moderation/api/"+current_version;
-        System.out.println(moderation_url);
-        ResponseEntity<String> moderation_result = restTemplate.exchange(moderation_url, HttpMethod.POST, moderation_request,String.class ) ;
+        String moderation_request_url = "http://"+ moderation_url+"/";
+        System.out.println(moderation_request_url);
+        ResponseEntity<String> moderation_result = restTemplate.exchange(moderation_request_url, HttpMethod.POST, moderation_request,String.class ) ;
         if(moderation_result.getStatusCode() != HttpStatus.OK){
             System.out.println("Error while moderating review: "+moderation_result.getStatusCode());
         }
@@ -111,7 +89,7 @@ public class ReviewProcessLayerController {
         
         //Extracting tags
         HttpEntity<Review> tag_request = new HttpEntity<>(censored_review, headers);
-        String tag_url = "http://"+tagextractor_host+":"+tagextractor_port+"/tag-extractor/api/"+current_version;
+        String tag_url = "http://"+tagextractor_url+"/"+review.getSittingSpotId();
         ResponseEntity<List<Tag>> tag_result = restTemplate.exchange(
                                                 tag_url, HttpMethod.POST, tag_request,
                                                 new ParameterizedTypeReference<List<Tag>>() {},
@@ -129,7 +107,7 @@ public class ReviewProcessLayerController {
 
         //Posting censored review
         HttpEntity<Review> publishing_request = new HttpEntity<>(censored_review, headers);
-        String publishing_url = "http://"+ reviewdl_host+":"+reviewdl_port+"/review-dl/api/"+current_version;
+        String publishing_url = "http://"+ reviewdl_url+"/";
         ResponseEntity<Void> publishing_result = restTemplate.exchange(publishing_url, HttpMethod.POST, publishing_request, Void.class) ;
         if (publishing_result.getStatusCode() == HttpStatus.OK){
             return;
