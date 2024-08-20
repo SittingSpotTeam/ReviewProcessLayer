@@ -1,1 +1,1 @@
-docker build . -t sittingspotapp/reviewprocesslayer:1.1-dev && docker push sittingspotapp/reviewprocesslayer:1.1-dev
+docker build . -t sittingspotapp/reviewprocesslayer:1.3-dev && docker push sittingspotapp/reviewprocesslayer:1.3-dev

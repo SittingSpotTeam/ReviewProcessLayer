@@ -1,10 +1,12 @@
 package com.sittingspot.reviewprocesslayer.controllers;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sittingspot.reviewprocesslayer.models.Review;
 import com.sittingspot.reviewprocesslayer.models.Tag;
 
 import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
@@ -26,6 +28,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
+@Log4j2
 @RestController
 @RequestMapping("/api/v1")
 public class ReviewProcessLayerController {
@@ -48,26 +51,29 @@ public class ReviewProcessLayerController {
     @GetMapping
     public List<Review> getReviewById(@RequestParam String id) throws IOException, InterruptedException {
 
-        String url = "http://"+ reviewdl_url+"/review-dl/api/"+current_version;
-        HttpHeaders headers = new HttpHeaders();
-        //TODO SET CUSTOM HEADERS
-        HttpEntity<String> request = new HttpEntity<>(null, headers);
-        //generating url
-        System.out.println(url);
-        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(url)
-                .queryParam("sittingSpotId", id);
-        // System.out.println(url)
-        //fetching resources
-        ResponseEntity<List<Review>> result = restTemplate.exchange(
-                                                builder.toUriString(), HttpMethod.GET, request,
-                                                new ParameterizedTypeReference<List<Review>>() {},
-                                                Collections.emptyMap() ) ;
-        return result.getBody();
+        String searchUrl = "http://"+reviewdl_url+"?id="+id;
+        log.info("Sending request "+searchUrl);
+
+        var searchRequest = HttpRequest.newBuilder()
+                .uri(URI.create(searchUrl))
+                .header("Content-Type", "application/json")
+                .build();
+        var result = HttpClient.newHttpClient().send(searchRequest, HttpResponse.BodyHandlers.ofString());
+
+        log.info("Got response code: "+result.statusCode());
+
+        if(result.statusCode() != 200) {
+            throw new ResponseStatusException(HttpStatus.valueOf(result.statusCode()));
+        }
+
+        List<Review> ret = new ObjectMapper().readerForListOf(Review.class).readValue(result.body());
+
+        return ret;
     }
 
 
     @PostMapping
-    public void postReview(@RequestBody Review review){
+    public void postReview(@RequestBody Review review) throws IOException, InterruptedException {
         HttpHeaders headers = new HttpHeaders();
         //TODO SET CUSTOM HEADERS
 
@@ -75,45 +81,38 @@ public class ReviewProcessLayerController {
 
         //censoring corpus
         HttpEntity<String> moderation_request = new HttpEntity<>(review.corpus(), headers);
-        String moderation_request_url = "http://"+ moderation_url+"/";
-        System.out.println(moderation_request_url);
+        String moderation_request_url = "http://"+ moderation_url;
+        log.info("Sending request "+moderation_request_url + " with "+review.corpus());
         ResponseEntity<String> moderation_result = restTemplate.exchange(moderation_request_url, HttpMethod.POST, moderation_request,String.class ) ;
         if(moderation_result.getStatusCode() != HttpStatus.OK){
             System.out.println("Error while moderating review: "+moderation_result.getStatusCode());
         }
         String censored_corpus = moderation_result.getBody();
         
-        System.out.println("ReviewCensored:"+censored_corpus);
+        log.info("ReviewCensored:"+censored_corpus);
         Review censored_review = new Review(review.sittingSpotId(), censored_corpus);
 
         
         //Extracting tags
-        HttpEntity<Review> tag_request = new HttpEntity<>(censored_review, headers);
         String tag_url = "http://"+tagextractor_url+"/"+review.getSittingSpotId();
-        ResponseEntity<List<Tag>> tag_result = restTemplate.exchange(
-                                                tag_url, HttpMethod.POST, tag_request,
-                                                new ParameterizedTypeReference<List<Tag>>() {},
-                                                Collections.emptyMap() ) ;
-        if (tag_result.getStatusCode() == HttpStatus.OK){
-            //TODO WHO TO SEND TAGS TO? USE tag_result.getBody()
-            System.out.println(tag_result.getBody());
-        }
-        else{
-            System.err.println("Error while retrieving tags: "+tag_result.getStatusCode());
-        }
+        log.info("Sending request "+tag_url + " with "+censored_review);
 
-        System.out.println("Review Tagged");
+        var tagExtractionRequest = HttpRequest.newBuilder()
+                .uri(URI.create(tag_url))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(censored_review.corpus()))
+                .build();
+        var tagExtractionResutl = HttpClient.newHttpClient().send(tagExtractionRequest, HttpResponse.BodyHandlers.ofString());
 
+        log.info("Got response code: "+tagExtractionResutl.statusCode());
 
         //Posting censored review
         HttpEntity<Review> publishing_request = new HttpEntity<>(censored_review, headers);
-        String publishing_url = "http://"+ reviewdl_url+"/";
+        String publishing_url = "http://"+ reviewdl_url;
+        log.info("Sending request "+publishing_url + " with "+censored_review);
         ResponseEntity<Void> publishing_result = restTemplate.exchange(publishing_url, HttpMethod.POST, publishing_request, Void.class) ;
-        if (publishing_result.getStatusCode() == HttpStatus.OK){
-            return;
-        }
-        else{
-            System.err.println("Error while publishing review: "+ publishing_result.getStatusCode());
+        if(publishing_result.getStatusCode() != HttpStatus.OK){
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Error while publishing review");
         }
 
         return;
