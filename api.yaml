@@ -4,7 +4,7 @@ info:
   description: Process Layer that allows to add or read reviews
   version: 1.0.0
 servers:
-  - url: https://review-pl/api/v1
+  - url: https://reviewprocesslayer/api/v1
 paths:
   /:
     get:
