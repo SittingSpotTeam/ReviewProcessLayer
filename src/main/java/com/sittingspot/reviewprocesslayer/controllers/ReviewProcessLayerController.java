@@ -2,25 +2,18 @@ package com.sittingspot.reviewprocesslayer.controllers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sittingspot.reviewprocesslayer.models.Review;
-import com.sittingspot.reviewprocesslayer.models.Tag;
 
-import lombok.AllArgsConstructor;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
-import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-import java.util.Collections;
 import java.util.List;
 import java.io.IOException;
 import java.net.URI;
@@ -72,17 +65,18 @@ public class ReviewProcessLayerController {
     }
 
 
-    @PostMapping
-    public void postReview(@RequestBody Review review) throws IOException, InterruptedException {
+    @PostMapping("/{id}")
+    public void postReview(@PathVariable String id,@RequestBody String text) throws IOException, InterruptedException {
         HttpHeaders headers = new HttpHeaders();
         //TODO SET CUSTOM HEADERS
 
         //TODO CHECKING THAT SITTING SPOT EXISTS
 
+        var review = new Review(id,text);
         //censoring corpus
-        HttpEntity<String> moderation_request = new HttpEntity<>(review.corpus(), headers);
+        HttpEntity<String> moderation_request = new HttpEntity<>(review.getCorpus(), headers);
         String moderation_request_url = "http://"+ moderation_url;
-        log.info("Sending request "+moderation_request_url + " with "+review.corpus());
+        log.info("Sending request "+moderation_request_url + " with "+review.getCorpus());
         ResponseEntity<String> moderation_result = restTemplate.exchange(moderation_request_url, HttpMethod.POST, moderation_request,String.class ) ;
         if(moderation_result.getStatusCode() != HttpStatus.OK){
             System.out.println("Error while moderating review: "+moderation_result.getStatusCode());
@@ -90,7 +84,7 @@ public class ReviewProcessLayerController {
         String censored_corpus = moderation_result.getBody();
         
         log.info("ReviewCensored:"+censored_corpus);
-        Review censored_review = new Review(review.sittingSpotId(), censored_corpus);
+        Review censored_review = new Review(review.getSittingSpotId(), censored_corpus);
 
         
         //Extracting tags
@@ -100,7 +94,7 @@ public class ReviewProcessLayerController {
         var tagExtractionRequest = HttpRequest.newBuilder()
                 .uri(URI.create(tag_url))
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(censored_review.corpus()))
+                .POST(HttpRequest.BodyPublishers.ofString(censored_review.getCorpus()))
                 .build();
         var tagExtractionResutl = HttpClient.newHttpClient().send(tagExtractionRequest, HttpResponse.BodyHandlers.ofString());
 
